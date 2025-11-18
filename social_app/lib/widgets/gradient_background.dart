@@ -1,7 +1,7 @@
 // lib/widgets/gradient_background.dart
+// Gradient background using real Discord-style purple tones.
+
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../theme_provider.dart';
 
 class GradientBackground extends StatelessWidget {
   final Widget child;
@@ -10,13 +10,17 @@ class GradientBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final isDark = themeProvider.isDarkMode;
-
     return Container(
-      decoration: BoxDecoration(
-        gradient:
-            isDark ? ThemeProvider.darkGradient : ThemeProvider.lightGradient,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF6A5AE0), // discord purple 1
+            Color(0xFF7F6BEE), // discord purple 2
+            Color(0xFF5E4BC7), // deep violet
+          ],
+        ),
       ),
       child: child,
     );

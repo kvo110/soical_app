@@ -1,15 +1,13 @@
 // lib/widgets/server_sidebar.dart
-import 'package:flutter/material.dart';
+// Kenny Vo - collapsible Discord-style sidebar (overflow safe)
 
-import '../screens/message_boards_screen.dart';
-import '../screens/chat_screen.dart';
-import '../screens/profile_screen.dart';
-import '../screens/settings_screen.dart';
-import '../theme_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/sidebar_provider.dart';
 
 class ServerSidebar extends StatelessWidget {
   final int selectedIndex;
-  final void Function(int) onTap;
+  final Function(int) onTap;
 
   const ServerSidebar({
     super.key,
@@ -19,96 +17,161 @@ class ServerSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final servers = [
-      {"emoji": "💬", "label": "General"},
-      {"emoji": "🎮", "label": "Gaming"},
-      {"emoji": "📘", "label": "School"},
-      {"emoji": "🖥️", "label": "Tech"},
-      {"emoji": "🚗", "label": "Cars"},
-    ];
+    final sidebar = Provider.of<SidebarProvider>(context);
+    final isExpanded = sidebar.isExpanded;
 
-    return Container(
-      width: 72,
-      color: ThemeProvider.discordDarker,
-      child: Column(
-        children: [
-          const SizedBox(height: 10),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-          // Top "home" style icon (can route to boards)
-          _serverIcon(
-            emoji: "🏠",
-            index: -1,
-            isActive: selectedIndex == -1,
-            onTap: () => onTap(-1),
-          ),
+    final sidebarColor =
+        isDark ? const Color(0xFF1E1F22) : const Color(0xFFD6D6D6);
 
-          const SizedBox(height: 10),
-          Container(
-            height: 1,
-            width: 36,
-            color: Colors.white24,
-          ),
-
-          // Servers list
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.only(top: 8),
-              itemCount: servers.length,
-              itemBuilder: (_, i) {
-                final s = servers[i];
-                return _serverIcon(
-                  emoji: s["emoji"]!,
-                  index: i,
-                  isActive: selectedIndex == i,
-                  onTap: () => onTap(i),
-                );
-              },
+    return Material(
+      color: Colors.transparent,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        width: isExpanded ? 240 : 70,
+        decoration: BoxDecoration(
+          color: sidebarColor.withOpacity(0.95),
+          border: Border(
+            right: BorderSide(
+              color: isDark ? Colors.white12 : Colors.black26,
             ),
           ),
+        ),
+        child: Column(
+          children: [
+            // SAFE HEADER (NO OVERFLOW)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+              child: isExpanded
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Menu",
+                          style: TextStyle(
+                            color: isDark ? Colors.white70 : Colors.black87,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.chevron_left,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                          onPressed: sidebar.toggle,
+                        ),
+                      ],
+                    )
+                  : Center(
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.chevron_right,
+                          color: isDark ? Colors.white70 : Colors.black87,
+                        ),
+                        onPressed: sidebar.toggle,
+                      ),
+                    ),
+            ),
 
-          const SizedBox(height: 8),
-        ],
+            const SizedBox(height: 4),
+
+            // Navigation buttons
+            _item(
+              context,
+              index: 0,
+              icon: Icons.chat_bubble,
+              label: "Boards",
+              selected: selectedIndex == 0,
+              expanded: isExpanded,
+              onTap: onTap,
+            ),
+            _item(
+              context,
+              index: 1,
+              icon: Icons.person,
+              label: "Profile",
+              selected: selectedIndex == 1,
+              expanded: isExpanded,
+              onTap: onTap,
+            ),
+            _item(
+              context,
+              index: 2,
+              icon: Icons.settings,
+              label: "Settings",
+              selected: selectedIndex == 2,
+              expanded: isExpanded,
+              onTap: onTap,
+            ),
+
+            const Spacer(),
+
+            _item(
+              context,
+              index: 3,
+              icon: Icons.logout,
+              label: "Logout",
+              selected: false,
+              expanded: isExpanded,
+              onTap: onTap,
+            ),
+
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _serverIcon({
-    required String emoji,
+  // Sidebar item widget
+  Widget _item(
+    BuildContext context, {
     required int index,
-    required bool isActive,
-    required VoidCallback onTap,
+    required IconData icon,
+    required String label,
+    required bool expanded,
+    required bool selected,
+    required Function(int) onTap,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          height: 54,
-          width: 54,
-          decoration: BoxDecoration(
-            color: isActive ? ThemeProvider.discordBlurple : Colors.white10,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isActive ? Colors.white : Colors.white24,
-              width: isActive ? 2 : 1,
-            ),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: ThemeProvider.discordBlurple.withOpacity(0.7),
-                      blurRadius: 18,
-                      spreadRadius: 2,
-                    ),
-                  ]
-                : [],
-          ),
-          child: Center(
-            child: Text(
-              emoji,
-              style: const TextStyle(fontSize: 24),
-            ),
-          ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final iconColor = isDark
+        ? (selected ? Colors.white : Colors.white70)
+        : (selected ? Colors.black : Colors.black87);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => onTap(index),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          vertical: 14,
+          horizontal: expanded ? 20 : 0,
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? (isDark ? Colors.white12 : Colors.black12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment:
+              expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: iconColor, size: 24),
+            if (expanded) ...[
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: iconColor,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

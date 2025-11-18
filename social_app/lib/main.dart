@@ -1,12 +1,20 @@
-// lib/main.dart
+// main.dart
+// Kenny Vo - Social App (Discord-style Flutter + Firebase)
+// Bootstraps Firebase, sets up global providers, and handles routing.
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 
+// firebase config
 import 'firebase_options.dart';
-import 'theme_provider.dart';
 
+// theme + sidebar providers
+import 'providers/theme_provider.dart';
+import 'providers/sidebar_provider.dart';
+
+// screens
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
@@ -22,8 +30,11 @@ void main() async {
   );
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => SidebarProvider()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -34,86 +45,39 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+    final themeProv = Provider.of<ThemeProvider>(context);
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Social App',
-      themeMode: themeProvider.themeMode,
+      title: "Social App",
 
-      // ☀️ Light theme – still Discord-ish but softer
+      // Dark / Light theme switching
+      themeMode: themeProv.themeMode,
+
+      // light theme
       theme: ThemeData(
         brightness: Brightness.light,
-        scaffoldBackgroundColor: Colors.transparent,
-        colorScheme: const ColorScheme.light(
-          primary: ThemeProvider.discordBlurple,
-          secondary: Colors.blueAccent,
-          surface: Colors.white,
-          onSurface: ThemeProvider.discordTextDark,
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          foregroundColor: ThemeProvider.discordTextDark,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white.withOpacity(0.9),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.black12),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.black12),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(
-              color: ThemeProvider.discordBlurple,
-              width: 1.6,
-            ),
-          ),
+        fontFamily: "ggSans",
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+          brightness: Brightness.light,
         ),
         useMaterial3: true,
       ),
 
-      // 🌙 Dark theme – Discord vibe
+      // dark theme (Discord-style)
       darkTheme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.transparent,
-        colorScheme: const ColorScheme.dark(
-          primary: ThemeProvider.discordBlurple,
-          surface: ThemeProvider.discordDarker,
-          onSurface: ThemeProvider.discordTextLight,
+        fontFamily: "ggSans",
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+          brightness: Brightness.dark,
         ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          foregroundColor: ThemeProvider.discordTextLight,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: ThemeProvider.discordDark,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.white24),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Colors.white24),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(
-              color: ThemeProvider.discordBlurple,
-              width: 1.6,
-            ),
-          ),
-        ),
+        scaffoldBackgroundColor: Colors.black,
         useMaterial3: true,
       ),
 
+      // routes
       routes: {
         '/login': (_) => const LoginScreen(),
         '/register': (_) => const RegisterScreen(),
@@ -127,7 +91,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// decides where user goes depending on login state
+/// Decides where to send the user based on auth state
 class Root extends StatelessWidget {
   const Root({super.key});
 
@@ -136,17 +100,17 @@ class Root extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // while waiting on Firebase connection → show splash
+        // still loading Firebase → splash screen
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SplashScreen();
         }
 
-        // if user is logged in → go to boards
+        // logged in
         if (snapshot.hasData) {
           return const MessageBoardsScreen();
         }
 
-        // if NOT logged in → go straight to login screen
+        // not logged in
         return const LoginScreen();
       },
     );

@@ -1,11 +1,13 @@
 // lib/screens/register_screen.dart
+// Register screen stores user info in Firebase Auth + Firestore.
+// UI matches the login card with the same purple blurred styling.
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../widgets/gradient_background.dart';
-import '../theme_provider.dart';
+import '../providers/theme_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -15,71 +17,63 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final _formKey = GlobalKey<FormState>();
+  final form = GlobalKey<FormState>();
 
-  final _firstNameCtrl = TextEditingController();
-  final _lastNameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
+  final firstCtrl = TextEditingController();
+  final lastCtrl = TextEditingController();
+  final emailCtrl = TextEditingController();
+  final passCtrl = TextEditingController();
 
-  bool _isLoading = false;
-  String? _error;
+  bool loading = false;
+  String? errorMsg;
 
   @override
   void dispose() {
-    _firstNameCtrl.dispose();
-    _lastNameCtrl.dispose();
-    _emailCtrl.dispose();
-    _passwordCtrl.dispose();
+    firstCtrl.dispose();
+    lastCtrl.dispose();
+    emailCtrl.dispose();
+    passCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _register() async {
-    final valid = _formKey.currentState?.validate() ?? false;
-    if (!valid) return;
+  Future<void> doRegister() async {
+    final ok = form.currentState?.validate() ?? false;
+    if (!ok) return;
 
     setState(() {
-      _isLoading = true;
-      _error = null;
+      loading = true;
+      errorMsg = null;
     });
 
     try {
-      final auth = FirebaseAuth.instance;
-      final result = await auth.createUserWithEmailAndPassword(
-        email: _emailCtrl.text.trim(),
-        password: _passwordCtrl.text.trim(),
+      final result = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: emailCtrl.text.trim(),
+        password: passCtrl.text.trim(),
       );
 
       final user = result.user;
-      if (user == null) {
-        throw Exception("User is null after registration.");
-      }
+      if (user == null) throw Exception("User creation failed.");
 
-      // Store user data
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'firstName': _firstNameCtrl.text.trim(),
-        'lastName': _lastNameCtrl.text.trim(),
-        'displayName':
-            "${_firstNameCtrl.text.trim()} ${_lastNameCtrl.text.trim()}",
-        'email': _emailCtrl.text.trim(),
-        'role': 'Student',
-        'createdAt': FieldValue.serverTimestamp(),
+      // save extra data
+      await FirebaseFirestore.instance.collection("users").doc(user.uid).set({
+        "firstName": firstCtrl.text.trim(),
+        "lastName": lastCtrl.text.trim(),
+        "displayName": "${firstCtrl.text.trim()} ${lastCtrl.text.trim()}",
+        "role": "Student",
+        "email": emailCtrl.text.trim(),
+        "registeredAt": FieldValue.serverTimestamp(),
       });
 
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/boards');
+      Navigator.pushReplacementNamed(context, "/boards");
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        _error = e.message ?? "Registration failed.";
-      });
-    } catch (e) {
-      setState(() {
-        _error = "Something went wrong. Please try again.";
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      setState(() => errorMsg = e.message);
+    } catch (_) {
+      setState(() => errorMsg = "Something went wrong.");
+    }
+
+    if (mounted) {
+      setState(() => loading = false);
     }
   }
 
@@ -89,79 +83,56 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          automaticallyImplyLeading: false,
-          title: const Text("Create account"),
+          title: const Text("Create Account"),
           centerTitle: true,
+          backgroundColor: Colors.transparent,
         ),
         body: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 28),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(
-                  color:
-                      Theme.of(context).colorScheme.surface.withOpacity(0.97),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.08),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      blurRadius: 18,
-                      offset: const Offset(0, 16),
-                      color: Colors.black.withOpacity(0.35),
-                    ),
-                  ],
+                  color: ThemeProvider.glassBackground(context),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: ThemeProvider.glassBorder(context)),
+                  boxShadow: ThemeProvider.glassShadow(context),
                 ),
                 child: Form(
-                  key: _formKey,
+                  key: form,
                   child: Column(
                     children: [
                       const Text(
-                        "Create your account",
+                        "Join the community",
                         style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "We just need a few basic details.",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: ThemeProvider.discordTextMuted,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 10),
 
-                      // First + last name row
+                      // first + last name row
                       Row(
                         children: [
                           Expanded(
                             child: TextFormField(
-                              controller: _firstNameCtrl,
+                              controller: firstCtrl,
                               decoration: const InputDecoration(
-                                labelText: "First name",
-                              ),
-                              validator: (value) =>
-                                  value == null || value.trim().isEmpty
-                                      ? "Required"
-                                      : null,
+                                  labelText: "First name"),
+                              validator: (v) =>
+                                  v == null || v.isEmpty ? "Required" : null,
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: TextFormField(
-                              controller: _lastNameCtrl,
-                              decoration: const InputDecoration(
-                                labelText: "Last name",
-                              ),
-                              validator: (value) =>
-                                  value == null || value.trim().isEmpty
-                                      ? "Required"
-                                      : null,
+                              controller: lastCtrl,
+                              decoration:
+                                  const InputDecoration(labelText: "Last name"),
+                              validator: (v) =>
+                                  v == null || v.isEmpty ? "Required" : null,
                             ),
                           ),
                         ],
@@ -170,101 +141,71 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       const SizedBox(height: 14),
 
                       TextFormField(
-                        controller: _emailCtrl,
+                        controller: emailCtrl,
                         decoration: const InputDecoration(labelText: "Email"),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return "Please enter your email";
-                          }
-                          if (!value.contains("@")) {
-                            return "Please enter a valid email";
-                          }
-                          return null;
-                        },
+                        validator: (v) => v == null || !v.contains("@")
+                            ? "Enter a valid email"
+                            : null,
                       ),
 
                       const SizedBox(height: 14),
 
                       TextFormField(
-                        controller: _passwordCtrl,
+                        controller: passCtrl,
+                        obscureText: true,
                         decoration:
                             const InputDecoration(labelText: "Password"),
-                        obscureText: true,
-                        validator: (value) => value == null || value.length < 6
-                            ? "Password must be at least 6 characters"
+                        validator: (v) => v == null || v.length < 6
+                            ? "Min 6 characters"
                             : null,
                       ),
 
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 14),
 
-                      if (_error != null) ...[
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            _error!,
-                            style: const TextStyle(
-                              color: Colors.redAccent,
-                              fontSize: 12,
-                            ),
+                      if (errorMsg != null)
+                        Text(
+                          errorMsg!,
+                          style: const TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 13,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                      ],
 
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 14),
 
-                      // Register button
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
-                          onPressed: _isLoading ? null : _register,
+                          onPressed: loading ? null : doRegister,
                           style: FilledButton.styleFrom(
-                            backgroundColor: ThemeProvider.discordBlurple,
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 12, horizontal: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 18,
-                                  width: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor:
-                                        AlwaysStoppedAnimation(Colors.white),
-                                  ),
+                              backgroundColor: ThemeProvider.discordBlurple),
+                          child: loading
+                              ? const CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor:
+                                      AlwaysStoppedAnimation(Colors.white),
                                 )
-                              : const Text(
-                                  "Create Account",
-                                  style: TextStyle(fontSize: 15),
-                                ),
+                              : const Text("Create Account"),
                         ),
                       ),
 
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 18),
 
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text(
-                            "Already have an account? ",
-                            style: TextStyle(fontSize: 13),
-                          ),
+                          const Text("Already have an account? "),
                           InkWell(
-                            onTap: () {
-                              Navigator.pushReplacementNamed(context, "/login");
-                            },
+                            onTap: () => Navigator.pushReplacementNamed(
+                                context, "/login"),
                             child: const Text(
                               "Log In",
                               style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
                                 color: ThemeProvider.discordBlurple,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ),
+                          )
                         ],
                       )
                     ],
