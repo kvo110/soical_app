@@ -22,6 +22,12 @@ dependencies:
   # Cloud Firestore (real-time database for messages & profiles)
   cloud_firestore: ^6.1.0
 
+  # Firebase Storage (for profile avatars)
+  firebase_storage: ^13.0.4
+
+  # Image Picker (select avatar image)
+  image_picker: ^1.1.1
+
   # Provider for theme + state updates
   provider: ^6.1.5+1
 
@@ -32,3 +38,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/boards/
+
+  fonts:
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/JetBrainsMono-Medium.ttf
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
