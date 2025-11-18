@@ -1,45 +1,58 @@
 // lib/screens/settings_screen.dart
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../widgets/gradient_background.dart';
+import '../widgets/server_sidebar.dart';
 import '../theme_provider.dart';
-import '../services/auth_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Provider.of<ThemeProvider>(context);
-    final auth = AuthService();
+    final themeProv = Provider.of<ThemeProvider>(context);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text("Settings")),
-      body: ListView(
+    return GradientBackground(
+      child: Row(
         children: [
-          SwitchListTile(
-            title: const Text("Dark Mode"),
-            value: theme.isDarkMode,
-            onChanged: (v) => theme.toggleTheme(v),
-          ),
-          const Divider(),
-          const ListTile(
-            title: Text("Change login info (placeholder)"),
-          ),
-          const ListTile(
-            title: Text("Change DOB or personal details (placeholder)"),
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text("Logout"),
-            onTap: () async {
-              await auth.logout();
-              if (context.mounted) {
-                Navigator.pushNamedAndRemoveUntil(
-                    context, '/login', (_) => false);
-              }
+          ServerSidebar(
+            selectedIndex: -1,
+            onTap: (_) {
+              Navigator.pushReplacementNamed(context, '/boards');
             },
+          ),
+          Expanded(
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
+                title: const Text("Settings"),
+              ),
+              body: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  SwitchListTile(
+                    title: const Text("Dark Mode"),
+                    value: themeProv.isDarkMode,
+                    onChanged: (val) => themeProv.toggleTheme(val),
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                    ),
+                    onPressed: () async {
+                      await FirebaseAuth.instance.signOut();
+                      if (context.mounted) {
+                        Navigator.pushReplacementNamed(context, '/login');
+                      }
+                    },
+                    child: const Text("Log Out"),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

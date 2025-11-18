@@ -12,7 +12,16 @@
           "package_name": "com.example.social_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "195331976-1dsvut50si1eovvp1c2vnd4090bb8hnh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.social_app",
+            "certificate_hash": "18e954482720e044b9ee74a5832996ae5e0d4459"
+          }
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDW2WireH4FB4LLg012Seb4XSv1qZc5bhE"

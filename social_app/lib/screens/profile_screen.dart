@@ -1,91 +1,108 @@
 // lib/screens/profile_screen.dart
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
-class ProfileScreen extends StatefulWidget {
+import '../widgets/gradient_background.dart';
+import '../widgets/server_sidebar.dart';
+import '../theme_provider.dart';
+
+class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
-}
-
-class _ProfileScreenState extends State<ProfileScreen> {
-  bool _loading = true;
-
-  final _first = TextEditingController();
-  final _last = TextEditingController();
-  final _role = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-
-    final data = doc.data();
-    if (data != null) {
-      _first.text = data['firstName'] ?? "";
-      _last.text = data['lastName'] ?? "";
-      _role.text = data['role'] ?? "";
-    }
-
-    setState(() => _loading = false);
-  }
-
-  Future<void> _save() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-      'firstName': _first.text.trim(),
-      'lastName': _last.text.trim(),
-      'role': _role.text.trim(),
-    });
-
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text("Profile updated")));
+  Future<Map<String, dynamic>?> _fetchUser() async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final doc =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    return doc.data();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
+    return GradientBackground(
+      child: Row(
+        children: [
+          ServerSidebar(
+            selectedIndex: -1,
+            onTap: (_) {
+              Navigator.pushReplacementNamed(context, '/boards');
+            },
+          ),
+          Expanded(
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              appBar: AppBar(
+                title: const Text("Profile"),
+              ),
+              body: FutureBuilder(
+                future: _fetchUser(),
+                builder: (_, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (!snapshot.hasData || snapshot.data == null) {
+                    return const Center(
+                      child: Text("No profile data found."),
+                    );
+                  }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text("Profile")),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: ListView(
-          children: [
-            TextField(
-              controller: _first,
-              decoration: const InputDecoration(labelText: "First Name"),
+                  final user = snapshot.data! as Map<String, dynamic>;
+
+                  return ListView(
+                    padding: const EdgeInsets.all(20),
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: ThemeProvider.discordDarker.withOpacity(0.96),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        child: Column(
+                          children: [
+                            const CircleAvatar(
+                              radius: 40,
+                              backgroundColor: Colors.white24,
+                              child: Icon(
+                                Icons.person,
+                                size: 40,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              user["displayName"] ?? "",
+                              style: const TextStyle(
+                                fontSize: 20,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              user["email"] ?? "",
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.white70,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "Role: ${user["role"] ?? "Student"}",
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-            TextField(
-              controller: _last,
-              decoration: const InputDecoration(labelText: "Last Name"),
-            ),
-            TextField(
-              controller: _role,
-              decoration: const InputDecoration(labelText: "Role"),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(onPressed: _save, child: const Text("Save"))
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
