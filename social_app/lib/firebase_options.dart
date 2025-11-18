@@ -85,4 +85,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'social-app-2ae1c.firebasestorage.app',
     measurementId: 'G-KGM5T1CKFZ',
   );
+
 }
