@@ -1,6 +1,10 @@
 // lib/widgets/server_sidebar.dart
-// Kenny Vo - collapsible Discord-style sidebar (overflow safe)
+// Kenny Vo - Sidebar but a little nicer.
+// Grabs the logged-in user's avatar + display name from Firebase
+// and shows it at the top. Also has some light animations so it feels smoother.
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/sidebar_provider.dart';
@@ -21,14 +25,18 @@ class ServerSidebar extends StatelessWidget {
     final isExpanded = sidebar.isExpanded;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     final sidebarColor =
         isDark ? const Color(0xFF1E1F22) : const Color(0xFFD6D6D6);
+
+    // temp user reference
+    final user = FirebaseAuth.instance.currentUser;
+    final docRef =
+        FirebaseFirestore.instance.collection("users").doc(user!.uid);
 
     return Material(
       color: Colors.transparent,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
+        duration: const Duration(milliseconds: 260),
         width: isExpanded ? 240 : 70,
         decoration: BoxDecoration(
           color: sidebarColor.withOpacity(0.95),
@@ -40,44 +48,128 @@ class ServerSidebar extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // SAFE HEADER (NO OVERFLOW)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-              child: isExpanded
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "Menu",
-                          style: TextStyle(
-                            color: isDark ? Colors.white70 : Colors.black87,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            Icons.chevron_left,
-                            color: isDark ? Colors.white70 : Colors.black87,
-                          ),
-                          onPressed: sidebar.toggle,
-                        ),
-                      ],
-                    )
-                  : Center(
-                      child: IconButton(
-                        icon: Icon(
-                          Icons.chevron_right,
-                          color: isDark ? Colors.white70 : Colors.black87,
-                        ),
-                        onPressed: sidebar.toggle,
+              child: GestureDetector(
+                onTap: sidebar.toggle,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  transitionBuilder: (child, anim) {
+                    return FadeTransition(
+                      opacity: anim,
+                      child: SlideTransition(
+                        position: Tween(
+                          begin: const Offset(0.1, 0),
+                          end: Offset.zero,
+                        ).animate(anim),
+                        child: child,
                       ),
-                    ),
+                    );
+                  },
+                  child: isExpanded
+                      ? Row(
+                          key: const ValueKey("expanded_header"),
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              "Menu",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.chevron_left),
+                              onPressed: sidebar.toggle,
+                            ),
+                          ],
+                        )
+                      : Center(
+                          key: const ValueKey("collapsed_header"),
+                          child: Icon(
+                            Icons.chevron_right,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
+                ),
+              ),
             ),
 
-            const SizedBox(height: 4),
+            // user info (avatar + display name)
+            FutureBuilder<DocumentSnapshot>(
+              future: docRef.get(),
+              builder: (context, snap) {
+                if (!snap.hasData) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: CircleAvatar(
+                      radius: isExpanded ? 26 : 22,
+                      backgroundColor: Colors.grey.shade700,
+                      child: const Icon(Icons.person, color: Colors.white70),
+                    ),
+                  );
+                }
 
-            // Navigation buttons
+                final data = snap.data!.data() as Map<String, dynamic>?;
+
+                final avatarUrl = data?['avatarUrl'] as String?;
+                final displayName = data?['displayName'] as String? ?? "User";
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: isExpanded
+                        ? Row(
+                            key: const ValueKey("expanded_user"),
+                            children: [
+                              CircleAvatar(
+                                radius: 22,
+                                backgroundImage: avatarUrl != null
+                                    ? NetworkImage(avatarUrl)
+                                    : null,
+                                backgroundColor: Colors.grey.shade700,
+                                child: avatarUrl == null
+                                    ? const Icon(Icons.person,
+                                        color: Colors.white70)
+                                    : null,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  displayName,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            key: const ValueKey("collapsed_user"),
+                            children: [
+                              CircleAvatar(
+                                radius: 22,
+                                backgroundImage: avatarUrl != null
+                                    ? NetworkImage(avatarUrl)
+                                    : null,
+                                backgroundColor: Colors.grey.shade700,
+                                child: avatarUrl == null
+                                    ? const Icon(Icons.person,
+                                        color: Colors.white70)
+                                    : null,
+                              ),
+                            ],
+                          ),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 8),
+
             _item(
               context,
               index: 0,
@@ -87,6 +179,7 @@ class ServerSidebar extends StatelessWidget {
               expanded: isExpanded,
               onTap: onTap,
             ),
+
             _item(
               context,
               index: 1,
@@ -96,6 +189,7 @@ class ServerSidebar extends StatelessWidget {
               expanded: isExpanded,
               onTap: onTap,
             ),
+
             _item(
               context,
               index: 2,
@@ -125,7 +219,7 @@ class ServerSidebar extends StatelessWidget {
     );
   }
 
-  // Sidebar item widget
+  // the clickable menu row
   Widget _item(
     BuildContext context, {
     required int index,
@@ -137,14 +231,15 @@ class ServerSidebar extends StatelessWidget {
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final iconColor = isDark
-        ? (selected ? Colors.white : Colors.white70)
-        : (selected ? Colors.black : Colors.black87);
+    final color = selected
+        ? (isDark ? Colors.white : Colors.black)
+        : (isDark ? Colors.white70 : Colors.black87);
 
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
       onTap: () => onTap(index),
-      child: Container(
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: EdgeInsets.symmetric(
           vertical: 14,
           horizontal: expanded ? 20 : 0,
@@ -159,18 +254,21 @@ class ServerSidebar extends StatelessWidget {
           mainAxisAlignment:
               expanded ? MainAxisAlignment.start : MainAxisAlignment.center,
           children: [
-            Icon(icon, color: iconColor, size: 24),
+            Icon(icon, color: color, size: 24),
             if (expanded) ...[
               const SizedBox(width: 12),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: iconColor,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: color,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ],
+            ]
           ],
         ),
       ),

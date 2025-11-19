@@ -1,5 +1,7 @@
 // lib/screens/chat_screen.dart
-// A Discord-style chat room that loads messages live using Firestore snapshots.
+// Kenny Vo - Chat room page where all messages show live.
+// I added better timestamps, grouped dates, auto-scroll, and
+// made sure it shows the user's actual displayName from Firestore.
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,13 +22,41 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final msgCtrl = TextEditingController();
+  final scrollCtrl = ScrollController();
+
+  @override
+  void dispose() {
+    msgCtrl.dispose();
+    scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<String> _getDisplayName(String uid, String fallbackEmail) async {
+    try {
+      final doc =
+          await FirebaseFirestore.instance.collection("users").doc(uid).get();
+
+      if (!doc.exists) return fallbackEmail;
+
+      final data = doc.data()!;
+      final dn = data["displayName"];
+      if (dn != null && dn.toString().trim().isNotEmpty) {
+        return dn;
+      }
+      return fallbackEmail;
+    } catch (_) {
+      return fallbackEmail;
+    }
+  }
 
   Future<void> sendMessage() async {
-    if (msgCtrl.text.trim().isEmpty) return;
+    final text = msgCtrl.text.trim();
+    if (text.isEmpty) return;
 
     final user = FirebaseAuth.instance.currentUser!;
-    final text = msgCtrl.text.trim();
     msgCtrl.clear();
+
+    final displayName = await _getDisplayName(user.uid, user.email ?? "User");
 
     await FirebaseFirestore.instance
         .collection("boards")
@@ -35,9 +65,33 @@ class _ChatScreenState extends State<ChatScreen> {
         .add({
       "text": text,
       "uid": user.uid,
-      "sender": user.email ?? "User",
+      "sender": displayName,
       "timestamp": FieldValue.serverTimestamp(),
     });
+
+    await Future.delayed(const Duration(milliseconds: 80));
+    if (scrollCtrl.hasClients) {
+      scrollCtrl.jumpTo(scrollCtrl.position.maxScrollExtent);
+    }
+  }
+
+  String _formatDate(DateTime dt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final msgDay = DateTime(dt.year, dt.month, dt.day);
+
+    if (msgDay == today) return "Today";
+    if (msgDay == today.subtract(const Duration(days: 1))) {
+      return "Yesterday";
+    }
+    return "${dt.month}/${dt.day}/${dt.year}";
+  }
+
+  String _formatTime(DateTime dt) {
+    final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final minute = dt.minute.toString().padLeft(2, "0");
+    final period = dt.hour >= 12 ? "PM" : "AM";
+    return "$hour:$minute $period";
   }
 
   @override
@@ -77,23 +131,70 @@ class _ChatScreenState extends State<ChatScreen> {
                       builder: (_, snap) {
                         if (!snap.hasData) {
                           return const Center(
-                            child: CircularProgressIndicator(),
-                          );
+                              child: CircularProgressIndicator());
                         }
 
                         final msgs = snap.data!.docs;
+                        final bubbles = <Widget>[];
 
-                        return ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: msgs.length,
-                          itemBuilder: (_, i) {
-                            final msg = msgs[i];
-                            return _bubble(
-                              msg["text"],
-                              msg["sender"],
-                              msg["uid"],
+                        String lastDate = "";
+
+                        for (int i = 0; i < msgs.length; i++) {
+                          final data = msgs[i].data() as Map<String, dynamic>;
+                          final ts = data["timestamp"] as Timestamp?;
+                          final dt = ts?.toDate() ?? DateTime.now();
+
+                          final dateLabel = _formatDate(dt);
+
+                          if (dateLabel != lastDate) {
+                            lastDate = dateLabel;
+                            bubbles.add(
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.10),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: Text(
+                                      dateLabel,
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             );
-                          },
+                          }
+
+                          bubbles.add(
+                            _bubble(
+                              text: data["text"] ?? "",
+                              sender: data["sender"] ?? "User",
+                              uid: data["uid"] ?? "",
+                              time: _formatTime(dt),
+                            ),
+                          );
+                        }
+
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (scrollCtrl.hasClients) {
+                            scrollCtrl
+                                .jumpTo(scrollCtrl.position.maxScrollExtent);
+                          }
+                        });
+
+                        return ListView(
+                          controller: scrollCtrl,
+                          padding: const EdgeInsets.all(16),
+                          children: bubbles,
                         );
                       },
                     ),
@@ -102,7 +203,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -110,7 +211,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _inputBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.15),
       ),
@@ -141,7 +242,12 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _bubble(String text, String sender, String uid) {
+  Widget _bubble({
+    required String text,
+    required String sender,
+    required String uid,
+    required String time,
+  }) {
     final myUid = FirebaseAuth.instance.currentUser!.uid;
     final mine = uid == myUid;
 
@@ -152,26 +258,39 @@ class _ChatScreenState extends State<ChatScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: mine
-              ? ThemeProvider.discordBlurple.withOpacity(0.7)
-              : Colors.white.withOpacity(0.08),
+              ? ThemeProvider.discordBlurple.withOpacity(0.75)
+              : Colors.white.withOpacity(0.12),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
           crossAxisAlignment:
               mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            Text(
-              sender,
-              style: TextStyle(
-                fontSize: 11,
-                color: mine ? Colors.white70 : Colors.white60,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  sender,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: mine ? Colors.white70 : Colors.white60,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  time,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Colors.white38,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(
               text,
-              style: const TextStyle(color: Colors.white),
-            )
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+            ),
           ],
         ),
       ),
